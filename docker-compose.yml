@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: ./backend
+    container_name: pmtracker-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/pmtracker.db
+      # Get free API key at https://www.goldapi.io/ (300 requests/month)
+      - GOLDAPI_KEY=${GOLDAPI_KEY:-}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: pmtracker-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
