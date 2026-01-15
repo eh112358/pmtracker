@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from ..database import get_db
+from ..auth import get_current_user
 from .. import models, schemas
 from ..services.price_service import price_service
 
@@ -10,14 +11,20 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 @router.get("/prices", response_model=schemas.SpotPrices)
-async def get_spot_prices():
+async def get_spot_prices(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     """Get current spot prices for all metals."""
     prices = await price_service.get_spot_prices()
     return schemas.SpotPrices(**prices)
 
 
 @router.get("/holdings", response_model=List[schemas.HoldingWithValue])
-async def get_holdings_with_values(db: Session = Depends(get_db)):
+async def get_holdings_with_values(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     """Get all holdings with current values and profit/loss calculations."""
     holdings = (
         db.query(models.Holding)
@@ -66,7 +73,10 @@ async def get_holdings_with_values(db: Session = Depends(get_db)):
 
 
 @router.get("/summary", response_model=schemas.PortfolioSummary)
-async def get_portfolio_summary(db: Session = Depends(get_db)):
+async def get_portfolio_summary(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     """Get overall portfolio summary with totals and allocation."""
     holdings = (
         db.query(models.Holding)

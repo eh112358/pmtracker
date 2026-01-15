@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './services/api';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import HoldingsTable from './components/HoldingsTable';
 import AddHoldingModal from './components/AddHoldingModal';
 import AllocationChart from './components/AllocationChart';
 
-function App() {
+function AppContent() {
+  const { isAuthenticated, loading: authLoading, logout } = useAuth();
   const [prices, setPrices] = useState(null);
   const [summary, setSummary] = useState(null);
   const [holdings, setHoldings] = useState([]);
@@ -14,9 +17,11 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingHolding, setEditingHolding] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
+    setError(null);
     try {
       const [pricesData, summaryData, holdingsData, productsData] = await Promise.all([
         api.getPrices(),
@@ -29,8 +34,9 @@ function App() {
       setSummary(summaryData);
       setHoldings(holdingsData);
       setProducts(productsData);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+      setError(err.message || 'Failed to load data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -38,8 +44,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [fetchData, isAuthenticated]);
 
   const handleRefreshPrices = () => {
     fetchData(true);
@@ -81,10 +89,22 @@ function App() {
     }
   };
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="app">
         <div className="loading">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading">Loading portfolio...</div>
       </div>
     );
   }
@@ -93,33 +113,35 @@ function App() {
     <div className="app">
       <header>
         <h1>PM Tracker</h1>
-        {prices && (
-          <div className="spot-prices">
-            <div className="spot-price">
-              <div className="metal">Gold</div>
-              <div className="price">${prices.gold.toFixed(2)}</div>
+        <div className="spot-prices">
+          {error && (
+            <div className="error-message" style={{ margin: '0 10px', padding: '5px 10px' }}>
+              {error}
             </div>
-            <div className="spot-price">
-              <div className="metal">Silver</div>
-              <div className="price">${prices.silver.toFixed(2)}</div>
-            </div>
-            <div className="spot-price">
-              <div className="metal">Platinum</div>
-              <div className="price">${prices.platinum.toFixed(2)}</div>
-            </div>
-            <div className="spot-price">
-              <div className="metal">Palladium</div>
-              <div className="price">${prices.palladium.toFixed(2)}</div>
-            </div>
-            <button
-              className="btn btn-refresh"
-              onClick={handleRefreshPrices}
-              disabled={refreshing}
-            >
-              {refreshing ? 'Refreshing...' : 'Refresh Prices'}
-            </button>
-          </div>
-        )}
+          )}
+          {prices && (
+            <>
+              <div className="spot-price">
+                <div className="metal">Gold</div>
+                <div className="price">${prices.gold.toFixed(2)}</div>
+              </div>
+              <div className="spot-price">
+                <div className="metal">Silver</div>
+                <div className="price">${prices.silver.toFixed(2)}</div>
+              </div>
+            </>
+          )}
+          <button
+            className="btn btn-refresh"
+            onClick={handleRefreshPrices}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh Prices'}
+          </button>
+          <button className="btn btn-logout" onClick={logout}>
+            Logout
+          </button>
+        </div>
       </header>
 
       {summary && <Dashboard summary={summary} />}
@@ -164,6 +186,14 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

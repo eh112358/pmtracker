@@ -10,7 +10,8 @@ class PriceService:
     def __init__(self):
         self._cache: Optional[dict] = None
         self._cache_time: Optional[datetime] = None
-        self._cache_duration = timedelta(minutes=5)
+        self._cache_duration = timedelta(minutes=30)  # Cache for 30 min to reduce API calls
+        self._rate_limited_until: Optional[datetime] = None
 
     async def get_spot_prices(self) -> dict:
         """
@@ -22,12 +23,20 @@ class PriceService:
             if datetime.now() - self._cache_time < self._cache_duration:
                 return self._cache
 
+        # Check if we're rate limited
+        if self._rate_limited_until and datetime.now() < self._rate_limited_until:
+            print(f"Rate limited until {self._rate_limited_until}, using cached/fallback prices")
+            if self._cache:
+                return self._cache
+            return self._get_fallback_prices()
+
         # Try to fetch from API
         prices = await self._fetch_from_api()
 
         if prices:
             self._cache = prices
             self._cache_time = datetime.now()
+            self._rate_limited_until = None  # Clear rate limit on success
             return prices
 
         # Return fallback/cached prices if API fails
@@ -65,8 +74,6 @@ class PriceService:
         metals = {
             "XAU": "gold",
             "XAG": "silver",
-            "XPT": "platinum",
-            "XPD": "palladium"
         }
         prices = {}
 
@@ -82,6 +89,11 @@ class PriceService:
                     if response.status_code == 200:
                         data = response.json()
                         prices[name] = data.get("price", 0)
+                    elif response.status_code == 429:
+                        # Rate limited - back off for 1 hour
+                        print(f"GoldAPI rate limited (429). Backing off for 1 hour.")
+                        self._rate_limited_until = datetime.now() + timedelta(hours=1)
+                        return None
                     else:
                         print(f"GoldAPI error for {symbol}: {response.status_code}")
                         return None
@@ -104,7 +116,7 @@ class PriceService:
                     params={
                         "access_key": api_key,
                         "base": "USD",
-                        "symbols": "XAU,XAG,XPT,XPD"
+                        "symbols": "XAU,XAG"
                     },
                     timeout=10.0
                 )
@@ -117,8 +129,6 @@ class PriceService:
                         return {
                             "gold": 1 / rates.get("XAU") if rates.get("XAU") else 0,
                             "silver": 1 / rates.get("XAG") if rates.get("XAG") else 0,
-                            "platinum": 1 / rates.get("XPT") if rates.get("XPT") else 0,
-                            "palladium": 1 / rates.get("XPD") if rates.get("XPD") else 0,
                             "updated_at": datetime.now()
                         }
         except Exception as e:
@@ -128,14 +138,14 @@ class PriceService:
 
     def _get_fallback_prices(self) -> dict:
         """
-        Fallback prices for development/testing when no API key is configured.
+        Fallback prices when API is unavailable or rate limited.
+        These are approximate values - live prices will be used when available.
         """
         return {
             "gold": 2650.00,
-            "silver": 31.50,
-            "platinum": 1020.00,
-            "palladium": 1050.00,
-            "updated_at": datetime.now()
+            "silver": 30.00,
+            "updated_at": datetime.now(),
+            "is_fallback": True
         }
 
 
