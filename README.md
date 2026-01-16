@@ -24,12 +24,24 @@ A local web application to track the purchase prices and current value of your p
    cd pmtracker
    ```
 
-2. Build and start the containers:
+2. **Set up your API key** (for live spot prices):
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+
+   # Get a free API key from https://www.goldapi.io/ (300 requests/month)
+   # Edit .env and add your API key:
+   # GOLDAPI_KEY=your-actual-key-here
+   ```
+
+   **Note**: The application will work without an API key using fallback prices for testing.
+
+3. Build and start the containers:
    ```bash
    docker-compose up --build
    ```
 
-3. Access the application:
+4. Access the application:
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
@@ -62,21 +74,40 @@ npm start
 
 ## Configuration
 
+### Environment Setup
+
+The application uses a `.env` file for configuration. This file is **not tracked in Git** for security.
+
+**First-time setup**:
+```bash
+# Copy the template
+cp .env.example .env
+
+# Edit .env and add your API key
+nano .env  # or use your preferred editor
+```
+
+**Required configuration**:
+```bash
+# .env file
+GOLDAPI_KEY=your-actual-key-here
+```
+
 ### Spot Price API
 
-By default, the application uses fallback prices for development. To enable live spot prices:
+The application supports two API providers:
 
-1. Sign up for an API key at [metals-api.com](https://metals-api.com) or similar service
-2. Set the environment variable:
-   ```bash
-   METALS_API_KEY=your_api_key_here
-   ```
+**Option 1: GoldAPI.io** (Recommended)
+- Free tier: 300 requests/month
+- Sign up: https://www.goldapi.io/
+- Set `GOLDAPI_KEY` in `.env` file
 
-Or add it to `docker-compose.yml`:
-```yaml
-environment:
-  - METALS_API_KEY=your_api_key_here
-```
+**Option 2: Metals-API.com** (Alternative)
+- Set `METALS_API_KEY` in `.env` file
+
+**Fallback**: If no API key is configured, the application uses static fallback prices for testing.
+
+For production deployment and advanced configuration options, see [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md).
 
 ## Project Structure
 
