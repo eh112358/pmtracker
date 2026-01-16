@@ -1,7 +1,8 @@
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
+from ..utils.secrets import get_secret
 
 
 class PriceService:
@@ -41,14 +42,14 @@ class PriceService:
         Supports: GoldAPI.io (GOLDAPI_KEY) or Metals-API (METALS_API_KEY)
         """
         # Try GoldAPI.io first (recommended free option)
-        goldapi_key = os.getenv("GOLDAPI_KEY")
+        goldapi_key = get_secret("GOLDAPI_KEY")
         if goldapi_key:
             prices = await self._fetch_from_goldapi(goldapi_key)
             if prices:
                 return prices
 
         # Try Metals-API as fallback
-        metals_api_key = os.getenv("METALS_API_KEY")
+        metals_api_key = get_secret("METALS_API_KEY")
         if metals_api_key:
             prices = await self._fetch_from_metals_api(metals_api_key)
             if prices:
