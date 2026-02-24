@@ -3,13 +3,17 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from ..database import get_db
+from ..auth import get_current_user
 from .. import models, schemas
 
 router = APIRouter(prefix="/api/holdings", tags=["holdings"])
 
 
 @router.get("/", response_model=List[schemas.Holding])
-def get_holdings(db: Session = Depends(get_db)):
+def get_holdings(
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     return (
         db.query(models.Holding)
         .options(
@@ -20,7 +24,11 @@ def get_holdings(db: Session = Depends(get_db)):
 
 
 @router.get("/{holding_id}", response_model=schemas.Holding)
-def get_holding(holding_id: int, db: Session = Depends(get_db)):
+def get_holding(
+    holding_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     holding = (
         db.query(models.Holding)
         .options(
@@ -35,7 +43,11 @@ def get_holding(holding_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=schemas.Holding)
-def create_holding(holding: schemas.HoldingCreate, db: Session = Depends(get_db)):
+def create_holding(
+    holding: schemas.HoldingCreate,
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     # Verify product exists
     product = db.query(models.Product).filter(models.Product.id == holding.product_id).first()
     if not product:
@@ -61,7 +73,8 @@ def create_holding(holding: schemas.HoldingCreate, db: Session = Depends(get_db)
 def update_holding(
     holding_id: int,
     holding_update: schemas.HoldingUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
 ):
     holding = db.query(models.Holding).filter(models.Holding.id == holding_id).first()
     if not holding:
@@ -95,7 +108,11 @@ def update_holding(
 
 
 @router.delete("/{holding_id}")
-def delete_holding(holding_id: int, db: Session = Depends(get_db)):
+def delete_holding(
+    holding_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(get_current_user)
+):
     holding = db.query(models.Holding).filter(models.Holding.id == holding_id).first()
     if not holding:
         raise HTTPException(status_code=404, detail="Holding not found")

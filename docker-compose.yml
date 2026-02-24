@@ -8,17 +8,24 @@ services:
       - ./backend/data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/pmtracker.db
-      # Get free API key at https://www.goldapi.io/ (300 requests/month)
       - GOLDAPI_KEY=${GOLDAPI_KEY:-}
       # CORS - Comma-separated list of allowed origins
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     restart: unless-stopped
+    networks:
+      - pmtracker-net
 
   frontend:
     build: ./frontend
     container_name: pmtracker-frontend
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - pmtracker-net
+
+networks:
+  pmtracker-net:
+    driver: bridge

@@ -1,8 +1,17 @@
 import httpx
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
 from ..utils.secrets import get_secret
+
+# API keys must be printable ASCII with no whitespace or header-injection characters
+_API_KEY_RE = re.compile(r'^[\x21-\x7E]+$')
+
+
+def _validate_api_key(key: str) -> bool:
+    """Return True only if key contains safe printable ASCII (no whitespace/control chars)."""
+    return bool(_API_KEY_RE.match(key))
 
 
 class PriceService:
@@ -11,7 +20,8 @@ class PriceService:
     def __init__(self):
         self._cache: Optional[dict] = None
         self._cache_time: Optional[datetime] = None
-        self._cache_duration = timedelta(minutes=5)
+        self._cache_duration = timedelta(minutes=30)  # Cache for 30 min to reduce API calls
+        self._rate_limited_until: Optional[datetime] = None
 
     async def get_spot_prices(self) -> dict:
         """
@@ -23,12 +33,20 @@ class PriceService:
             if datetime.now() - self._cache_time < self._cache_duration:
                 return self._cache
 
+        # Check if we're rate limited
+        if self._rate_limited_until and datetime.now() < self._rate_limited_until:
+            print(f"Rate limited until {self._rate_limited_until}, using cached/fallback prices")
+            if self._cache:
+                return self._cache
+            return self._get_fallback_prices()
+
         # Try to fetch from API
         prices = await self._fetch_from_api()
 
         if prices:
             self._cache = prices
             self._cache_time = datetime.now()
+            self._rate_limited_until = None  # Clear rate limit on success
             return prices
 
         # Return fallback/cached prices if API fails
@@ -44,22 +62,28 @@ class PriceService:
         # Try GoldAPI.io first (recommended free option)
         goldapi_key = get_secret("GOLDAPI_KEY")
         if goldapi_key:
-            prices = await self._fetch_from_goldapi(goldapi_key)
-            if prices:
-                return prices
+            if not _validate_api_key(goldapi_key):
+                print("GOLDAPI_KEY contains invalid characters; skipping GoldAPI.")
+            else:
+                prices = await self._fetch_from_goldapi(goldapi_key)
+                if prices:
+                    return prices
 
         # Try Metals-API as fallback
         metals_api_key = get_secret("METALS_API_KEY")
         if metals_api_key:
-            prices = await self._fetch_from_metals_api(metals_api_key)
-            if prices:
-                return prices
+            if not _validate_api_key(metals_api_key):
+                print("METALS_API_KEY contains invalid characters; skipping Metals-API.")
+            else:
+                prices = await self._fetch_from_metals_api(metals_api_key)
+                if prices:
+                    return prices
 
         return None
 
     async def _fetch_from_goldapi(self, api_key: str) -> Optional[dict]:
         """
-        Fetch prices from GoldAPI.io
+        Fetch prices from GoldAPI.io for all four metals.
         Free tier: 300 requests/month
         Sign up at: https://www.goldapi.io/
         """
@@ -67,7 +91,7 @@ class PriceService:
             "XAU": "gold",
             "XAG": "silver",
             "XPT": "platinum",
-            "XPD": "palladium"
+            "XPD": "palladium",
         }
         prices = {}
 
@@ -83,6 +107,11 @@ class PriceService:
                     if response.status_code == 200:
                         data = response.json()
                         prices[name] = data.get("price", 0)
+                    elif response.status_code == 429:
+                        # Rate limited - back off for 1 hour
+                        print(f"GoldAPI rate limited (429). Backing off for 1 hour.")
+                        self._rate_limited_until = datetime.now() + timedelta(hours=1)
+                        return None
                     else:
                         print(f"GoldAPI error for {symbol}: {response.status_code}")
                         return None
@@ -90,13 +119,16 @@ class PriceService:
                 prices["updated_at"] = datetime.now()
                 return prices
 
+        except httpx.TimeoutException:
+            print("GoldAPI request timed out")
+            return None
         except Exception as e:
             print(f"Error fetching from GoldAPI: {e}")
             return None
 
     async def _fetch_from_metals_api(self, api_key: str) -> Optional[dict]:
         """
-        Fetch prices from Metals-API.com
+        Fetch prices from Metals-API.com for all four metals.
         """
         try:
             async with httpx.AsyncClient() as client:
@@ -115,13 +147,14 @@ class PriceService:
                     if data.get("success"):
                         rates = data.get("rates", {})
                         # API returns rates as 1/price, need to invert
-                        return {
-                            "gold": 1 / rates.get("XAU") if rates.get("XAU") else 0,
-                            "silver": 1 / rates.get("XAG") if rates.get("XAG") else 0,
-                            "platinum": 1 / rates.get("XPT") if rates.get("XPT") else 0,
-                            "palladium": 1 / rates.get("XPD") if rates.get("XPD") else 0,
-                            "updated_at": datetime.now()
-                        }
+                        result = {"updated_at": datetime.now()}
+                        for symbol, name in [("XAU", "gold"), ("XAG", "silver"),
+                                             ("XPT", "platinum"), ("XPD", "palladium")]:
+                            rate = rates.get(symbol)
+                            result[name] = (1 / rate) if rate else 0
+                        return result
+        except httpx.TimeoutException:
+            print("Metals-API request timed out")
         except Exception as e:
             print(f"Error fetching from Metals-API: {e}")
 
@@ -129,14 +162,16 @@ class PriceService:
 
     def _get_fallback_prices(self) -> dict:
         """
-        Fallback prices for development/testing when no API key is configured.
+        Fallback prices when API is unavailable or rate limited.
+        These are approximate values - live prices will be used when available.
         """
         return {
             "gold": 2650.00,
-            "silver": 31.50,
-            "platinum": 1020.00,
-            "palladium": 1050.00,
-            "updated_at": datetime.now()
+            "silver": 30.00,
+            "platinum": 950.00,
+            "palladium": 1000.00,
+            "updated_at": datetime.now(),
+            "is_fallback": True
         }
 
 
