@@ -2,7 +2,8 @@ import httpx
 import re
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
+from ..utils.secrets import get_secret
 
 # API keys must be printable ASCII with no whitespace or header-injection characters
 _API_KEY_RE = re.compile(r'^[\x21-\x7E]+$')
@@ -59,7 +60,7 @@ class PriceService:
         Supports: GoldAPI.io (GOLDAPI_KEY) or Metals-API (METALS_API_KEY)
         """
         # Try GoldAPI.io first (recommended free option)
-        goldapi_key = os.getenv("GOLDAPI_KEY")
+        goldapi_key = get_secret("GOLDAPI_KEY")
         if goldapi_key:
             if not _validate_api_key(goldapi_key):
                 print("GOLDAPI_KEY contains invalid characters; skipping GoldAPI.")
@@ -69,7 +70,7 @@ class PriceService:
                     return prices
 
         # Try Metals-API as fallback
-        metals_api_key = os.getenv("METALS_API_KEY")
+        metals_api_key = get_secret("METALS_API_KEY")
         if metals_api_key:
             if not _validate_api_key(metals_api_key):
                 print("METALS_API_KEY contains invalid characters; skipping Metals-API.")

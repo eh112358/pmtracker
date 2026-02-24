@@ -9,6 +9,8 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./data/pmtracker.db
       - GOLDAPI_KEY=${GOLDAPI_KEY:-}
+      # CORS - Comma-separated list of allowed origins
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     restart: unless-stopped
     networks:
       - pmtracker-net
