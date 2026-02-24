@@ -1,7 +1,16 @@
 import httpx
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+
+# API keys must be printable ASCII with no whitespace or header-injection characters
+_API_KEY_RE = re.compile(r'^[\x21-\x7E]+$')
+
+
+def _validate_api_key(key: str) -> bool:
+    """Return True only if key contains safe printable ASCII (no whitespace/control chars)."""
+    return bool(_API_KEY_RE.match(key))
 
 
 class PriceService:
@@ -52,28 +61,36 @@ class PriceService:
         # Try GoldAPI.io first (recommended free option)
         goldapi_key = os.getenv("GOLDAPI_KEY")
         if goldapi_key:
-            prices = await self._fetch_from_goldapi(goldapi_key)
-            if prices:
-                return prices
+            if not _validate_api_key(goldapi_key):
+                print("GOLDAPI_KEY contains invalid characters; skipping GoldAPI.")
+            else:
+                prices = await self._fetch_from_goldapi(goldapi_key)
+                if prices:
+                    return prices
 
         # Try Metals-API as fallback
         metals_api_key = os.getenv("METALS_API_KEY")
         if metals_api_key:
-            prices = await self._fetch_from_metals_api(metals_api_key)
-            if prices:
-                return prices
+            if not _validate_api_key(metals_api_key):
+                print("METALS_API_KEY contains invalid characters; skipping Metals-API.")
+            else:
+                prices = await self._fetch_from_metals_api(metals_api_key)
+                if prices:
+                    return prices
 
         return None
 
     async def _fetch_from_goldapi(self, api_key: str) -> Optional[dict]:
         """
-        Fetch prices from GoldAPI.io
+        Fetch prices from GoldAPI.io for all four metals.
         Free tier: 300 requests/month
         Sign up at: https://www.goldapi.io/
         """
         metals = {
             "XAU": "gold",
             "XAG": "silver",
+            "XPT": "platinum",
+            "XPD": "palladium",
         }
         prices = {}
 
@@ -101,13 +118,16 @@ class PriceService:
                 prices["updated_at"] = datetime.now()
                 return prices
 
+        except httpx.TimeoutException:
+            print("GoldAPI request timed out")
+            return None
         except Exception as e:
             print(f"Error fetching from GoldAPI: {e}")
             return None
 
     async def _fetch_from_metals_api(self, api_key: str) -> Optional[dict]:
         """
-        Fetch prices from Metals-API.com
+        Fetch prices from Metals-API.com for all four metals.
         """
         try:
             async with httpx.AsyncClient() as client:
@@ -116,7 +136,7 @@ class PriceService:
                     params={
                         "access_key": api_key,
                         "base": "USD",
-                        "symbols": "XAU,XAG"
+                        "symbols": "XAU,XAG,XPT,XPD"
                     },
                     timeout=10.0
                 )
@@ -126,11 +146,14 @@ class PriceService:
                     if data.get("success"):
                         rates = data.get("rates", {})
                         # API returns rates as 1/price, need to invert
-                        return {
-                            "gold": 1 / rates.get("XAU") if rates.get("XAU") else 0,
-                            "silver": 1 / rates.get("XAG") if rates.get("XAG") else 0,
-                            "updated_at": datetime.now()
-                        }
+                        result = {"updated_at": datetime.now()}
+                        for symbol, name in [("XAU", "gold"), ("XAG", "silver"),
+                                             ("XPT", "platinum"), ("XPD", "palladium")]:
+                            rate = rates.get(symbol)
+                            result[name] = (1 / rate) if rate else 0
+                        return result
+        except httpx.TimeoutException:
+            print("Metals-API request timed out")
         except Exception as e:
             print(f"Error fetching from Metals-API: {e}")
 
@@ -144,6 +167,8 @@ class PriceService:
         return {
             "gold": 2650.00,
             "silver": 30.00,
+            "platinum": 950.00,
+            "palladium": 1000.00,
             "updated_at": datetime.now(),
             "is_fallback": True
         }

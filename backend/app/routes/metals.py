@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List
 
 from ..database import get_db
@@ -29,7 +30,7 @@ def get_metal(
     return metal
 
 
-@router.post("/", response_model=schemas.Metal)
+@router.post("/", response_model=schemas.Metal, status_code=201)
 def create_metal(
     metal: schemas.MetalCreate,
     db: Session = Depends(get_db),
@@ -37,6 +38,13 @@ def create_metal(
 ):
     db_metal = models.Metal(**metal.model_dump())
     db.add(db_metal)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A metal with that name or symbol already exists."
+        )
     db.refresh(db_metal)
     return db_metal

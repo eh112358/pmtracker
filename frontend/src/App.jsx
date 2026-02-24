@@ -129,6 +129,18 @@ function AppContent() {
                 <div className="metal">Silver</div>
                 <div className="price">${prices.silver.toFixed(2)}</div>
               </div>
+              {prices.platinum > 0 && (
+                <div className="spot-price">
+                  <div className="metal">Platinum</div>
+                  <div className="price">${prices.platinum.toFixed(2)}</div>
+                </div>
+              )}
+              {prices.palladium > 0 && (
+                <div className="spot-price">
+                  <div className="metal">Palladium</div>
+                  <div className="price">${prices.palladium.toFixed(2)}</div>
+                </div>
+              )}
             </>
           )}
           <button

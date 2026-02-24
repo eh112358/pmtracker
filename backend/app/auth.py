@@ -46,7 +46,7 @@ def create_access_token(db: Session) -> str:
     """Create a JWT access token valid for 24 hours."""
     secret = get_jwt_secret(db)
     expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    to_encode = {"exp": expire, "type": "access"}
+    to_encode = {"sub": "pmtracker-user", "exp": expire, "type": "access"}
     return jwt.encode(to_encode, secret, algorithm=ALGORITHM)
 
 
@@ -98,10 +98,10 @@ def get_current_user(
     try:
         secret = get_jwt_secret(db)
         payload = jwt.decode(credentials.credentials, secret, algorithms=[ALGORITHM])
-        if payload.get("type") != "access":
+        if payload.get("type") != "access" or payload.get("sub") != "pmtracker-user":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type"
+                detail="Invalid token"
             )
         return True
     except JWTError:

@@ -66,6 +66,13 @@ def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    holdings_count = db.query(models.Holding).filter(models.Holding.product_id == product_id).count()
+    if holdings_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete product: {holdings_count} holding(s) reference it. Delete those holdings first."
+        )
+
     db.delete(product)
     db.commit()
     return {"message": "Product deleted"}

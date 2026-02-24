@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, SessionLocal, Base
 from . import models
 from .routes import metals, products, holdings, portfolio, auth
+from .auth import get_current_user
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -19,8 +20,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Include routers
@@ -110,7 +111,7 @@ def health_check():
 
 
 @app.post("/api/admin/reseed")
-def reseed_database():
+def reseed_database(_: bool = Depends(get_current_user)):
     """Force reseed the database with metals and products."""
     db = SessionLocal()
     try:
