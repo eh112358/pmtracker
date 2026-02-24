@@ -1,5 +1,6 @@
 # Claude Code
 .claude/
+.mcp.json
 
 # Dependencies
 node_modules/
@@ -17,6 +18,12 @@ backend/data/*.db
 .env
 .env.local
 .env.*.local
+.env.production
+
+# Secrets
+secrets/
+*.key
+*.pem
 
 # IDE
 .idea/

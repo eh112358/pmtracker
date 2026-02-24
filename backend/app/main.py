@@ -1,12 +1,13 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .database import engine, SessionLocal, Base
 from . import models
 from .routes import metals, products, holdings, portfolio, auth
+from .auth import get_current_user
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -103,8 +104,8 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/api/admin/reseed", tags=["admin"])
-def reseed_database():
+@app.post("/api/admin/reseed")
+def reseed_database(_: bool = Depends(get_current_user)):
     """Force reseed the database with metals and products."""
     db = SessionLocal()
     try:

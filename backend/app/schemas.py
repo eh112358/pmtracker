@@ -143,5 +143,7 @@ class PortfolioSummary(BaseModel):
 class SpotPrices(BaseModel):
     gold: float
     silver: float
+    platinum: float = 0.0
+    palladium: float = 0.0
     updated_at: datetime
     is_fallback: Optional[bool] = False

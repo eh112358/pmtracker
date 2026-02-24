@@ -7,7 +7,7 @@ A local web application to track the purchase prices and current value of your p
 - **Password Protection** - Secure your portfolio data with password authentication
 - **Track Holdings** - Gold, Silver, Platinum, and Palladium products
 - **Pre-loaded Product Catalog** - American Eagles, Maple Leafs, Krugerrands, bars, and more
-- **Live Spot Prices** - Real-time gold and silver prices via GoldAPI.io
+- **Live Spot Prices** - Real-time prices for all four metals via GoldAPI.io
 - **Portfolio Summary** - Total cost basis, current value, and profit/loss calculations
 - **Allocation Breakdown** - Visual breakdown by metal type
 - **Detailed Records** - Purchase date, price per oz, premium, dealer, storage location, and notes
@@ -27,11 +27,17 @@ A local web application to track the purchase prices and current value of your p
    cd pmtracker
    ```
 
-2. Configure live spot prices (optional):
+2. **Set up your API key** (for live spot prices):
    ```bash
+   # Copy the example environment file
    cp .env.example .env
-   # Edit .env and add your GoldAPI key
+
+   # Get a free API key from https://www.goldapi.io/ (300 requests/month)
+   # Edit .env and add your API key:
+   # GOLDAPI_KEY=your-actual-key-here
    ```
+
+   **Note**: The application will work without an API key using fallback prices for testing.
 
 3. Build and start the container:
    ```bash
@@ -50,7 +56,7 @@ docker-compose down
 
 ## Spot Price Configuration (GoldAPI.io)
 
-The application uses [GoldAPI.io](https://www.goldapi.io/) for live gold and silver spot prices.
+The application uses [GoldAPI.io](https://www.goldapi.io/) for live spot prices for all four metals.
 
 ### Getting an API Key
 
@@ -76,15 +82,17 @@ environment:
 ### Rate Limiting
 
 - Prices are cached for **30 minutes** to conserve API calls
-- Each refresh makes **2 API calls** (gold and silver)
+- Each refresh makes up to **4 API calls** (gold, silver, platinum, palladium)
 - If rate limited, the app automatically uses fallback prices
-- Free tier: ~150 refreshes per month
+- Free tier: ~75 full refreshes per month
 
 ### Without an API Key
 
 The application works without an API key using fallback prices:
 - Gold: $2,650.00/oz
 - Silver: $30.00/oz
+- Platinum: $950.00/oz
+- Palladium: $1,000.00/oz
 
 ## Development Setup
 
@@ -108,6 +116,43 @@ npm start
 
 The Vite dev server proxies `/api` requests to `http://localhost:8000` automatically.
 
+## Configuration
+
+### Environment Setup
+
+The application uses a `.env` file for configuration. This file is **not tracked in Git** for security.
+
+**First-time setup**:
+```bash
+# Copy the template
+cp .env.example .env
+
+# Edit .env and add your API key
+nano .env  # or use your preferred editor
+```
+
+**Required configuration**:
+```bash
+# .env file
+GOLDAPI_KEY=your-actual-key-here
+```
+
+### Spot Price API
+
+The application supports two API providers:
+
+**Option 1: GoldAPI.io** (Recommended)
+- Free tier: 300 requests/month
+- Sign up: https://www.goldapi.io/
+- Set `GOLDAPI_KEY` in `.env` file
+
+**Option 2: Metals-API.com** (Alternative)
+- Set `METALS_API_KEY` in `.env` file
+
+**Fallback**: If no API key is configured, the application uses static fallback prices for testing.
+
+For production deployment and advanced configuration options, see [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md).
+
 ## Project Structure
 
 ```
@@ -130,8 +175,10 @@ pmtracker/
 │       │   ├── products.py
 │       │   ├── metals.py
 │       │   └── portfolio.py
-│       └── services/
-│           └── price_service.py  # GoldAPI integration
+│       ├── services/
+│       │   └── price_service.py  # GoldAPI integration
+│       └── utils/
+│           └── secrets.py  # Secret management
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.js
@@ -153,6 +200,7 @@ pmtracker/
 ├── TEST_PLAN.md
 ├── test_api.ps1            # PowerShell test script
 ├── test_api.sh             # Bash test script
+├── test_api_full.sh        # Comprehensive bash test suite
 └── README.md
 ```
 
@@ -170,7 +218,7 @@ pmtracker/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/portfolio/prices` | Get current spot prices |
+| GET | `/api/portfolio/prices` | Get current spot prices (all 4 metals) |
 | GET | `/api/portfolio/summary` | Get portfolio summary |
 | GET | `/api/portfolio/holdings` | Get holdings with calculated values |
 
@@ -192,7 +240,7 @@ pmtracker/
 | GET | `/api/products?metal_id=1` | Filter products by metal |
 | GET | `/api/metals` | List available metals |
 
-### Admin
+### Admin (requires authentication)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -211,8 +259,8 @@ API documentation is available at **http://localhost:3000/docs** when the contai
 
 - Password protected with bcrypt hashing
 - JWT tokens with 24-hour expiry
+- Rate limiting on authentication endpoints
 - Input validation on all endpoints
-- Tokens stored in browser localStorage
 
 ## Troubleshooting
 
@@ -230,7 +278,8 @@ docker-compose restart
 
 ### Reseed products
 ```bash
-curl -X POST http://localhost:3000/api/admin/reseed
+curl -X POST http://localhost:3000/api/admin/reseed \
+  -H "Authorization: Bearer <your-token>"
 ```
 
 ## License
