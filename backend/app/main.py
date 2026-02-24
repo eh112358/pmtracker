@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .database import engine, SessionLocal, Base
 from . import models
@@ -12,15 +15,6 @@ app = FastAPI(
     title="Precious Metals Tracker",
     description="Track your physical precious metals portfolio",
     version="1.0.0"
-)
-
-# CORS middleware for frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 # Include routers
@@ -109,7 +103,7 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/api/admin/reseed")
+@app.post("/api/admin/reseed", tags=["admin"])
 def reseed_database():
     """Force reseed the database with metals and products."""
     db = SessionLocal()
@@ -171,3 +165,16 @@ def reseed_database():
         return {"message": "Database reseeded successfully", "metals": 4, "products": len(products_data)}
     finally:
         db.close()
+
+
+# Serve frontend static files (when built frontend is present)
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = static_dir / full_path
+        if full_path and file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(static_dir / "index.html")

@@ -33,14 +33,12 @@ A local web application to track the purchase prices and current value of your p
    # Edit .env and add your GoldAPI key
    ```
 
-3. Build and start the containers:
+3. Build and start the container:
    ```bash
    docker-compose up --build -d
    ```
 
-4. Access the application:
-   - **Application**: http://localhost:3000
-   - **API Documentation**: http://localhost:8000/docs
+4. Access the application at **http://localhost:3000**
 
 5. On first visit, create a password (minimum 8 characters) to secure your data.
 
@@ -108,20 +106,16 @@ npm install
 npm start
 ```
 
-For development, set the API URL in the frontend:
-```bash
-# frontend/.env.local
-VITE_API_URL=http://localhost:8000
-```
+The Vite dev server proxies `/api` requests to `http://localhost:8000` automatically.
 
 ## Project Structure
 
 ```
 pmtracker/
-├── docker-compose.yml
+├── Dockerfile              # Multi-stage build (frontend + backend)
+├── docker-compose.yml      # Single container orchestration
 ├── .env                    # API keys (create from .env.example)
 ├── backend/
-│   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── data/               # SQLite database (persisted)
 │   └── app/
@@ -139,7 +133,6 @@ pmtracker/
 │       └── services/
 │           └── price_service.py  # GoldAPI integration
 ├── frontend/
-│   ├── Dockerfile
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── index.html
@@ -203,7 +196,10 @@ pmtracker/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/health` | Health check |
 | POST | `/api/admin/reseed` | Repopulate metals and products |
+
+API documentation is available at **http://localhost:3000/docs** when the container is running.
 
 ## Data Persistence
 
@@ -221,20 +217,20 @@ pmtracker/
 ## Troubleshooting
 
 ### "Failed to fetch" errors
-1. Ensure both containers are running: `docker ps`
-2. Check backend logs: `docker logs pmtracker-backend`
-3. Verify backend is accessible: http://localhost:8000/api/health
+1. Ensure the container is running: `docker ps`
+2. Check logs: `docker logs pmtracker`
+3. Verify health check: `curl http://localhost:3000/api/health`
 
 ### Database issues
 Reset the database:
 ```bash
 rm backend/data/pmtracker.db
-docker-compose restart backend
+docker-compose restart
 ```
 
 ### Reseed products
 ```bash
-curl -X POST http://localhost:8000/api/admin/reseed
+curl -X POST http://localhost:3000/api/admin/reseed
 ```
 
 ## License
