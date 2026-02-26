@@ -1,6 +1,10 @@
 services:
   pmtracker:
-    build: .
+    build:
+      context: .
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
     container_name: pmtracker
     ports:
       - "3000:8000"

@@ -9,8 +9,11 @@ RUN npm run build
 # Stage 2: Production
 FROM python:3.11-slim
 
-RUN groupadd --gid 1000 appgroup && \
-    useradd --uid 1000 --gid 1000 --create-home appuser
+ARG PUID=1000
+ARG PGID=1000
+
+RUN groupadd --gid ${PGID} appgroup && \
+    useradd --uid ${PUID} --gid ${PGID} --create-home appuser
 
 WORKDIR /app
 
